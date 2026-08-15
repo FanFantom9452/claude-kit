@@ -40,6 +40,21 @@ if ! claude plugin marketplace add "$MARKETPLACE_REPO"; then
     }
 fi
 
+# ---- replace conflicting installs -----------------------------------------
+# The same plugin name from another marketplace collides with this one: same
+# slash commands, same hooks, same flag files. Installing the kit is a statement
+# about which copy should win, so the other is removed first — and said out loud,
+# because it is the one destructive thing this script does.
+installed=$(claude plugin list 2>&1 || true)
+for p in $PLUGINS; do
+    for id in $(printf '%s\n' "$installed" | grep -o "$p@[^ ]*" | sort -u); do
+        from=${id#*@}
+        [ "$from" = "$MARKETPLACE_NAME" ] && continue
+        echo "Replacing  : $id  (conflicts with $p@$MARKETPLACE_NAME)"
+        claude plugin uninstall "$id" || true
+    done
+done
+
 # ---- plugins --------------------------------------------------------------
 # -y because stdout is not a TTY when piped into sh, and install refuses to
 # prompt there. Same fallback shape: installed already means update, not fail.

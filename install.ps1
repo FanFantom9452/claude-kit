@@ -46,6 +46,21 @@ if ($LASTEXITCODE -ne 0) {
     if ($LASTEXITCODE -ne 0) { throw "Could not add or refresh marketplace '$MarketplaceName'." }
 }
 
+# ---- replace conflicting installs -----------------------------------------
+# The same plugin name from another marketplace collides with this one: same
+# slash commands, same hooks, same flag files. Installing the kit is a statement
+# about which copy should win, so the other is removed first — and said out loud,
+# because it is the one destructive thing this script does.
+$installed = (& claude plugin list 2>&1) -join "`n"
+foreach ($p in $Plugins) {
+    foreach ($hit in [regex]::Matches($installed, "\b$([regex]::Escape($p))@(\S+)")) {
+        $from = $hit.Groups[1].Value
+        if ($from -eq $MarketplaceName) { continue }
+        Write-Host "Replacing  : $p@$from  (conflicts with $p@$MarketplaceName)"
+        & claude plugin uninstall "$p@$from" 2>&1 | Out-Host
+    }
+}
+
 # ---- plugins --------------------------------------------------------------
 # -y because stdout is not a TTY under `irm | iex`, and install refuses to
 # prompt there. Same fallback shape: installed already means update, not fail.
