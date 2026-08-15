@@ -25,19 +25,52 @@ alone instead of rewriting `settings.json` for nothing.
 
 ## What it installs
 
+**Mine** — forks, catalogued in this repo's `marketplace.json`:
+
 | | |
 |---|---|
-| [caveman](https://github.com/FanFantom9452/caveman/tree/per-session) | Ultra-compressed output |
-| [ponytail](https://github.com/FanFantom9452/ponytail/tree/per-session) | Lazy senior dev mode — YAGNI, stdlib first, shortest diff |
-| [TokenBar](https://github.com/FanFantom9452/ClaudeCodeCLI-TokenBar) | Two-line statusline: context window, 5h and 7d quota, git state, mode badges |
+| [caveman](https://github.com/FanFantom9452/caveman/tree/per-session) | Ultra-compressed prose |
+| [ponytail](https://github.com/FanFantom9452/ponytail/tree/per-session) | Lazy senior dev — YAGNI, stdlib first, shortest diff |
 
-The first two are forks of [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman)
-and [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail), each
-with one change: the mode flag is keyed by session id instead of being one file
-per machine. Upstream keeps the mode in `~/.claude/.caveman-active`, shared by
-every window, so switching mode in one switched it in all of them and opening a
-new window reset the others to the default. Forked so each terminal carries its
-own level. Everything else is upstream's, tracked on `main`.
+Forks of [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) and
+[DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail), each with
+one change: the mode flag is keyed by session id instead of being one file per
+machine. Upstream keeps it in `~/.claude/.caveman-active`, shared by every
+window, so switching mode in one switched it in all of them and opening a new
+window reset the others to the default. Forked so each terminal carries its own
+level. Everything else is upstream's, tracked on `main`.
+
+**Everyone else's** — listed in the installers, not re-catalogued here, so their
+updates arrive on their schedule and nothing goes stale behind them:
+
+| Marketplace | Plugins |
+|---|---|
+| [obra/superpowers](https://github.com/obra/superpowers) | `superpowers` — brainstorming, TDD, debugging, verification |
+| [anthropics/claude-code](https://github.com/anthropics/claude-code) | `frontend-design`, `security-guidance` |
+| [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) | `taste-skill` — anti-slop frontend direction |
+| [Owl-Listener/designer-skills](https://github.com/Owl-Listener/designer-skills) | `interaction-design`, `ux-strategy` (2 of its 33) |
+| [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | `impeccable` — design-language audit / harden / critique |
+| [multica-ai/andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) | `andrej-karpathy-skills` — guard-rails for LLM coding mistakes |
+| [Piebald-AI/claude-code-lsps](https://github.com/Piebald-AI/claude-code-lsps) | `typescript-language-server`, `pyright`, `rust-analyzer` |
+
+Published ids, not the names the docs use — `karpathy-guidelines` is really
+`andrej-karpathy-skills`, and the language servers drop the `-lsp` suffix.
+
+**MCP servers** — a different command and a different registry, no marketplace
+involved: `playwright` and `context7`. context7 works unauthenticated for a
+while and then wants a key; set `CONTEXT7_API_KEY` if you hit its rate limit.
+
+**Statusline** — [TokenBar](https://github.com/FanFantom9452/ClaudeCodeCLI-TokenBar):
+context window, 5h and 7d quota, git state, and a badge per active mode.
+
+### Deliberately not here
+
+`explanatory-output-style` pulls the opposite way from caveman — one wants more
+explanation, the other wants less — so running both just makes them argue. The
+official workflow plugins (`code-review`, `commit-commands`, `feature-dev`,
+`pr-review-toolkit`, …) overlap what Claude Code and superpowers already do.
+`github`, `greptile` and the Hugging Face bundle are situational rather than
+per-machine. All of them are one `claude plugin install` away when wanted.
 
 ## They start switched off
 

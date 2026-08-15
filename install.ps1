@@ -11,10 +11,37 @@
 
 $ErrorActionPreference = 'Stop'
 
-# The list to edit when something joins the kit. Everything below is generic.
+# ---- the lists to edit when something joins the kit -----------------------
+# Everything below them is generic.
+
+# Mine: the two forks, catalogued in this repo's own marketplace.json.
 $MarketplaceRepo = 'FanFantom9452/claude-kit'
 $MarketplaceName = 'kit'
 $Plugins         = @('caveman', 'ponytail')
+
+# Everyone else's. Listed here rather than re-catalogued in marketplace.json, so
+# upstream stays the source of truth: their updates arrive on their schedule and
+# nothing here goes stale behind them.
+#
+# Names are the ids the marketplaces actually publish, which are not always what
+# their docs call them — karpathy-guidelines is andrej-karpathy-skills, the LSPs
+# drop the -lsp suffix.
+$Upstream = @(
+    @{ Repo = 'obra/superpowers';                 Name = 'superpowers-dev';      Plugins = @('superpowers') }
+    @{ Repo = 'anthropics/claude-code';           Name = 'claude-code-plugins';  Plugins = @('frontend-design', 'security-guidance') }
+    @{ Repo = 'Leonxlnx/taste-skill';             Name = 'taste-skill';          Plugins = @('taste-skill') }
+    @{ Repo = 'Owl-Listener/designer-skills';     Name = 'designer-skills';      Plugins = @('interaction-design', 'ux-strategy') }
+    @{ Repo = 'pbakaus/impeccable';               Name = 'impeccable';           Plugins = @('impeccable') }
+    @{ Repo = 'multica-ai/andrej-karpathy-skills'; Name = 'karpathy-skills';     Plugins = @('andrej-karpathy-skills') }
+    @{ Repo = 'Piebald-AI/claude-code-lsps';      Name = 'claude-code-lsps';     Plugins = @('typescript-language-server', 'pyright', 'rust-analyzer') }
+)
+
+# MCP servers are not plugins and install through a different command entirely.
+$McpServers = @(
+    @{ Name = 'playwright'; Args = @('npx', '@playwright/mcp@latest') }
+    @{ Name = 'context7';   Args = @('npx', '-y', '@upstash/context7-mcp') }
+)
+
 $StatuslineUrl   = 'https://raw.githubusercontent.com/FanFantom9452/ClaudeCodeCLI-TokenBar/main/install.ps1'
 # Modes these plugins start in on a fresh machine. The point of the kit is that
 # they are switched on per window when wanted, not left running everywhere.
@@ -35,18 +62,35 @@ Write-Host "Config dir : $Cfg"
 Write-Host "Marketplace: $MarketplaceRepo"
 Write-Host ''
 
-# ---- marketplace ----------------------------------------------------------
-# `add` fails when it is already configured, which on a re-run is the normal
-# case rather than an error — refresh it instead, so a re-run picks up entries
-# added to marketplace.json since last time.
-& claude plugin marketplace add $MarketplaceRepo 2>&1 | Out-Host
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Already added - refreshing instead."
-    & claude plugin marketplace update $MarketplaceName 2>&1 | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw "Could not add or refresh marketplace '$MarketplaceName'." }
+$failed = @()
+
+# `add` fails when the marketplace is already configured, which on a re-run is
+# the normal case rather than an error — refresh it instead, so a re-run picks up
+# whatever has been added to it since last time.
+function Add-Marketplace($repo, $name) {
+    & claude plugin marketplace add $repo 2>&1 | Out-Host
+    if ($LASTEXITCODE -eq 0) { return $true }
+    Write-Host "  already added - refreshing instead"
+    & claude plugin marketplace update $name 2>&1 | Out-Host
+    return ($LASTEXITCODE -eq 0)
 }
 
-# ---- replace conflicting installs -----------------------------------------
+# -y because stdout is not a TTY under `irm | iex`, and install refuses to prompt
+# there. Same shape as above: already installed means update, not fail.
+function Install-Plugin($plugin, $market) {
+    Write-Host "  $plugin@$market"
+    & claude plugin install "$plugin@$market" -y 2>&1 | Out-Host
+    if ($LASTEXITCODE -eq 0) { return $true }
+    & claude plugin update "$plugin@$market" 2>&1 | Out-Host
+    return ($LASTEXITCODE -eq 0)
+}
+
+# ---- mine -----------------------------------------------------------------
+Write-Host "Mine:"
+if (-not (Add-Marketplace $MarketplaceRepo $MarketplaceName)) {
+    throw "Could not add or refresh marketplace '$MarketplaceName'."
+}
+
 # The same plugin name from another marketplace collides with this one: same
 # slash commands, same hooks, same flag files. Installing the kit is a statement
 # about which copy should win, so the other is removed first — and said out loud,
@@ -56,23 +100,42 @@ foreach ($p in $Plugins) {
     foreach ($hit in [regex]::Matches($installed, "\b$([regex]::Escape($p))@(\S+)")) {
         $from = $hit.Groups[1].Value
         if ($from -eq $MarketplaceName) { continue }
-        Write-Host "Replacing  : $p@$from  (conflicts with $p@$MarketplaceName)"
+        Write-Host "  replacing $p@$from  (conflicts with $p@$MarketplaceName)"
         & claude plugin uninstall "$p@$from" 2>&1 | Out-Host
     }
 }
-
-# ---- plugins --------------------------------------------------------------
-# -y because stdout is not a TTY under `irm | iex`, and install refuses to
-# prompt there. Same fallback shape: installed already means update, not fail.
-$failed = @()
 foreach ($p in $Plugins) {
+    if (-not (Install-Plugin $p $MarketplaceName)) { $failed += "$p@$MarketplaceName" }
+}
+
+# ---- everyone else's ------------------------------------------------------
+foreach ($m in $Upstream) {
     Write-Host ''
-    Write-Host "Installing $p@$MarketplaceName ..."
-    & claude plugin install "$p@$MarketplaceName" -y 2>&1 | Out-Host
-    if ($LASTEXITCODE -ne 0) {
-        & claude plugin update "$p@$MarketplaceName" 2>&1 | Out-Host
-        if ($LASTEXITCODE -ne 0) { $failed += $p }
+    Write-Host "$($m.Repo):"
+    if (-not (Add-Marketplace $m.Repo $m.Name)) {
+        $failed += "$($m.Name) (marketplace)"
+        continue
     }
+    foreach ($p in $m.Plugins) {
+        if (-not (Install-Plugin $p $m.Name)) { $failed += "$p@$($m.Name)" }
+    }
+}
+
+# ---- MCP servers ----------------------------------------------------------
+# Not plugins: different command, different registry, no marketplace involved.
+# `add` fails when the name is taken, which on a re-run means it is already
+# there — nothing to do, so that is not counted as a failure.
+Write-Host ''
+Write-Host "MCP servers:"
+$mcpExisting = (& claude mcp list 2>&1) -join "`n"
+foreach ($s in $McpServers) {
+    if ($mcpExisting -match "(?m)^\s*$([regex]::Escape($s.Name))\s*:") {
+        Write-Host "  $($s.Name) - already configured"
+        continue
+    }
+    Write-Host "  $($s.Name)"
+    & claude mcp add $s.Name -- @($s.Args) 2>&1 | Out-Host
+    if ($LASTEXITCODE -ne 0) { $failed += "$($s.Name) (mcp)" }
 }
 
 # ---- start dormant --------------------------------------------------------
