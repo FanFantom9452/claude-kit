@@ -25,12 +25,12 @@ alone instead of rewriting `settings.json` for nothing.
 
 ## What it installs
 
-**Mine** — forks, catalogued in this repo's `marketplace.json`:
+**Mine** — forks, each published as its own marketplace:
 
-| | |
-|---|---|
-| [caveman](https://github.com/FanFantom9452/caveman/tree/per-session) | Ultra-compressed prose |
-| [ponytail](https://github.com/FanFantom9452/ponytail/tree/per-session) | Lazy senior dev — YAGNI, stdlib first, shortest diff |
+| Marketplace | Plugin | |
+|---|---|---|
+| [caveman-per-session](https://github.com/FanFantom9452/caveman) | `caveman` | Ultra-compressed prose |
+| [ponytail-per-session](https://github.com/FanFantom9452/ponytail) | `ponytail` | Lazy senior dev — YAGNI, stdlib first, shortest diff |
 
 Forks of [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) and
 [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail), each with
@@ -38,10 +38,15 @@ one change: the mode flag is keyed by session id instead of being one file per
 machine. Upstream keeps it in `~/.claude/.caveman-active`, shared by every
 window, so switching mode in one switched it in all of them and opening a new
 window reset the others to the default. Forked so each terminal carries its own
-level. Everything else is upstream's, tracked on `main`.
+level.
 
-**Everyone else's** — listed in the installers, not re-catalogued here, so their
-updates arrive on their schedule and nothing goes stale behind them:
+The marketplace name carries the `-per-session` suffix so a machine that already
+has upstream's `caveman` or `ponytail` marketplace can keep it. The plugin name
+does not — it is still `caveman`, which really does collide, so the installer
+uninstalls the other copy before installing this one and says so when it does.
+
+**Everyone else's** — listed in the installers, so their updates arrive on their
+schedule and nothing goes stale behind them:
 
 | Marketplace | Plugins |
 |---|---|
@@ -101,9 +106,10 @@ ctx ███▊░░░░░░  38%    ·    5h ██████▌░░�
 ## Uninstall
 
 ```
-claude plugin uninstall caveman
-claude plugin uninstall ponytail
-claude plugin marketplace remove kit
+claude plugin uninstall caveman@caveman-per-session
+claude plugin uninstall ponytail@ponytail-per-session
+claude plugin marketplace remove caveman-per-session
+claude plugin marketplace remove ponytail-per-session
 ```
 
 Each plugin removes its own flags on the way out, including the per-session ones,
@@ -112,12 +118,21 @@ TokenBar repo.
 
 ## Adding to the kit
 
-Two lines, both in this repo:
+One row, in both installers — `$Mine` / `$Upstream` in `install.ps1`, `MINE` /
+`UPSTREAM` in `install.sh`:
 
-1. an entry in `.claude-plugin/marketplace.json` — `source` can point at another
-   GitHub repo (`{"source": "github", "repo": "owner/name", "ref": "branch"}`) or
-   at a directory in this one (`"./plugins/my-thing"`), so a plugin written from
-   scratch can just live here
-2. its name in the `$Plugins` / `PLUGINS` list at the top of both installers
+```
+repo  |  marketplace name  |  plugins to install from it
+```
 
-Machines that already have the kit pick it up on the next `install` re-run.
+The marketplace name is the `name` field inside that repo's
+`.claude-plugin/marketplace.json`, not the repo name, and it is what
+`<plugin>@<marketplace>` resolves against. Machines that already have the kit
+pick the new row up on the next re-run.
+
+A plugin written from scratch goes in its own repo with its own
+`marketplace.json`, then gets a row like any other. It cannot be catalogued here
+and pointed at another repo: Claude Code 2.1.233 clones a cross-repo plugin
+`source` over SSH with no HTTPS fallback, so that route fails on any machine
+without a GitHub key. Marketplace clones do fall back, which is why every entry
+above is one marketplace of its own.

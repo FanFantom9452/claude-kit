@@ -1,39 +1,49 @@
 # claude-kit installer (Windows)
 #   powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/FanFantom9452/claude-kit/main/install.ps1 | iex"
 #
-# Adds this marketplace, installs everything listed in it, and wires up the
-# statusline that reads what those plugins write. Safe to re-run: an already
-# added marketplace is refreshed rather than duplicated, an already installed
-# plugin is updated, and an already configured statusline is left alone.
+# Adds every marketplace in the kit, installs the plugins listed against each,
+# registers the MCP servers, and wires up the statusline that reads what those
+# plugins write. Safe to re-run: an already added marketplace is refreshed
+# rather than duplicated, an already installed plugin is updated, and an already
+# configured statusline is left alone.
 #
 # No `exit` anywhere on purpose — this script is meant to be piped into `iex`,
 # where `exit` would take the caller's shell down with it. Fatal problems throw.
 
-$ErrorActionPreference = 'Stop'
+# Not 'Stop'. Under 'Stop', anything a native exe writes to stderr becomes a
+# terminating error the moment `2>&1` merges it into the success stream, so a
+# single plugin that fails to install would abort the whole run — and the
+# $failed summary below, whose entire job is to report those, would never
+# print. Failures are collected explicitly; genuinely fatal states `throw`.
+$ErrorActionPreference = 'Continue'
 
 # ---- the lists to edit when something joins the kit -----------------------
 # Everything below them is generic.
 
-# Mine: the two forks, catalogued in this repo's own marketplace.json.
-$MarketplaceRepo = 'FanFantom9452/claude-kit'
-$MarketplaceName = 'kit'
-$Plugins         = @('caveman', 'ponytail')
+# Mine: forks of caveman and ponytail, each published as its own marketplace
+# straight from its repo. Not catalogued in a marketplace.json here, because a
+# plugin entry pointing at another GitHub repo is cloned over SSH by Claude Code
+# 2.1.233 with no HTTPS fallback, so it fails on any machine without a GitHub
+# key. The marketplace clone path does fall back, hence one marketplace each.
+$Mine = @(
+    @{ Repo = 'FanFantom9452/caveman';  Name = 'caveman-per-session';  Plugins = @('caveman') }
+    @{ Repo = 'FanFantom9452/ponytail'; Name = 'ponytail-per-session'; Plugins = @('ponytail') }
+)
 
-# Everyone else's. Listed here rather than re-catalogued in marketplace.json, so
-# upstream stays the source of truth: their updates arrive on their schedule and
-# nothing here goes stale behind them.
+# Everyone else's. Their updates arrive on their schedule; nothing here goes
+# stale behind them.
 #
 # Names are the ids the marketplaces actually publish, which are not always what
 # their docs call them — karpathy-guidelines is andrej-karpathy-skills, the LSPs
 # drop the -lsp suffix.
 $Upstream = @(
-    @{ Repo = 'obra/superpowers';                 Name = 'superpowers-dev';      Plugins = @('superpowers') }
-    @{ Repo = 'anthropics/claude-code';           Name = 'claude-code-plugins';  Plugins = @('frontend-design', 'security-guidance') }
-    @{ Repo = 'Leonxlnx/taste-skill';             Name = 'taste-skill';          Plugins = @('taste-skill') }
-    @{ Repo = 'Owl-Listener/designer-skills';     Name = 'designer-skills';      Plugins = @('interaction-design', 'ux-strategy') }
-    @{ Repo = 'pbakaus/impeccable';               Name = 'impeccable';           Plugins = @('impeccable') }
+    @{ Repo = 'obra/superpowers';                  Name = 'superpowers-dev';     Plugins = @('superpowers') }
+    @{ Repo = 'anthropics/claude-code';            Name = 'claude-code-plugins'; Plugins = @('frontend-design', 'security-guidance') }
+    @{ Repo = 'Leonxlnx/taste-skill';              Name = 'taste-skill';         Plugins = @('taste-skill') }
+    @{ Repo = 'Owl-Listener/designer-skills';      Name = 'designer-skills';     Plugins = @('interaction-design', 'ux-strategy') }
+    @{ Repo = 'pbakaus/impeccable';                Name = 'impeccable';          Plugins = @('impeccable') }
     @{ Repo = 'multica-ai/andrej-karpathy-skills'; Name = 'karpathy-skills';     Plugins = @('andrej-karpathy-skills') }
-    @{ Repo = 'Piebald-AI/claude-code-lsps';      Name = 'claude-code-lsps';     Plugins = @('typescript-language-server', 'pyright', 'rust-analyzer') }
+    @{ Repo = 'Piebald-AI/claude-code-lsps';       Name = 'claude-code-lsps';    Plugins = @('typescript-language-server', 'pyright', 'rust-analyzer') }
 )
 
 # MCP servers are not plugins and install through a different command entirely.
@@ -42,10 +52,10 @@ $McpServers = @(
     @{ Name = 'context7';   Args = @('npx', '-y', '@upstash/context7-mcp') }
 )
 
-$StatuslineUrl   = 'https://raw.githubusercontent.com/FanFantom9452/ClaudeCodeCLI-TokenBar/main/install.ps1'
+$StatuslineUrl = 'https://raw.githubusercontent.com/FanFantom9452/ClaudeCodeCLI-TokenBar/main/install.ps1'
 # Modes these plugins start in on a fresh machine. The point of the kit is that
 # they are switched on per window when wanted, not left running everywhere.
-$DormantTools    = @('caveman', 'ponytail')
+$DormantTools  = @('caveman', 'ponytail')
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -59,7 +69,6 @@ $Cfg = if ($env:CLAUDE_CONFIG_DIR)  { $env:CLAUDE_CONFIG_DIR }
        else { throw 'Cannot locate your home directory. Set CLAUDE_CONFIG_DIR and retry.' }
 
 Write-Host "Config dir : $Cfg"
-Write-Host "Marketplace: $MarketplaceRepo"
 Write-Host ''
 
 $failed = @()
@@ -85,31 +94,26 @@ function Install-Plugin($plugin, $market) {
     return ($LASTEXITCODE -eq 0)
 }
 
-# ---- mine -----------------------------------------------------------------
-Write-Host "Mine:"
-if (-not (Add-Marketplace $MarketplaceRepo $MarketplaceName)) {
-    throw "Could not add or refresh marketplace '$MarketplaceName'."
-}
-
-# The same plugin name from another marketplace collides with this one: same
-# slash commands, same hooks, same flag files. Installing the kit is a statement
-# about which copy should win, so the other is removed first — and said out loud,
-# because it is the one destructive thing this script does.
+# ---- replace the upstream copies of my forks ------------------------------
+# caveman and ponytail exist upstream under the same plugin name, and two copies
+# of one plugin means two sets of slash commands, two SessionStart hooks, and two
+# writers for the same flag file. Installing the kit is a statement about which
+# copy should win, so the other is removed first — and said out loud, because it
+# is the one destructive thing this script does.
+$mineMarkets = $Mine | ForEach-Object { $_.Name }
+$minePlugins = $Mine | ForEach-Object { $_.Plugins }
 $installed = (& claude plugin list 2>&1) -join "`n"
-foreach ($p in $Plugins) {
+foreach ($p in $minePlugins) {
     foreach ($hit in [regex]::Matches($installed, "\b$([regex]::Escape($p))@(\S+)")) {
         $from = $hit.Groups[1].Value
-        if ($from -eq $MarketplaceName) { continue }
-        Write-Host "  replacing $p@$from  (conflicts with $p@$MarketplaceName)"
+        if ($mineMarkets -contains $from) { continue }
+        Write-Host "Replacing $p@$from  (conflicts with my fork)"
         & claude plugin uninstall "$p@$from" 2>&1 | Out-Host
     }
 }
-foreach ($p in $Plugins) {
-    if (-not (Install-Plugin $p $MarketplaceName)) { $failed += "$p@$MarketplaceName" }
-}
 
-# ---- everyone else's ------------------------------------------------------
-foreach ($m in $Upstream) {
+# ---- marketplaces and their plugins ---------------------------------------
+foreach ($m in ($Mine + $Upstream)) {
     Write-Host ''
     Write-Host "$($m.Repo):"
     if (-not (Add-Marketplace $m.Repo $m.Name)) {
@@ -125,6 +129,10 @@ foreach ($m in $Upstream) {
 # Not plugins: different command, different registry, no marketplace involved.
 # `add` fails when the name is taken, which on a re-run means it is already
 # there — nothing to do, so that is not counted as a failure.
+#
+# -s user, because `mcp add` defaults to `local`, which scopes the server to
+# whatever directory the installer happened to run in. A one-line setup script
+# runs from wherever the terminal opened; the servers belong to the machine.
 Write-Host ''
 Write-Host "MCP servers:"
 $mcpExisting = (& claude mcp list 2>&1) -join "`n"
@@ -134,7 +142,7 @@ foreach ($s in $McpServers) {
         continue
     }
     Write-Host "  $($s.Name)"
-    & claude mcp add $s.Name -- @($s.Args) 2>&1 | Out-Host
+    & claude mcp add -s user $s.Name -- @($s.Args) 2>&1 | Out-Host
     if ($LASTEXITCODE -ne 0) { $failed += "$($s.Name) (mcp)" }
 }
 
@@ -142,8 +150,8 @@ foreach ($s in $McpServers) {
 # Only written when there is no config yet, so a default you set yourself is
 # never overwritten by a re-run.
 foreach ($tool in $DormantTools) {
-    $toolDir  = Join-Path $env:APPDATA $tool
-    $toolCfg  = Join-Path $toolDir 'config.json'
+    $toolDir = Join-Path $env:APPDATA $tool
+    $toolCfg = Join-Path $toolDir 'config.json'
     if (Test-Path $toolCfg) { continue }
     New-Item -ItemType Directory -Force -Path $toolDir | Out-Null
     [System.IO.File]::WriteAllText($toolCfg, "{ `"defaultMode`": `"off`" }`n", [System.Text.UTF8Encoding]::new($false))
@@ -175,7 +183,7 @@ if ($wired) {
 
 Write-Host ''
 if ($failed.Count) {
-    Write-Warning ("These did not install: " + ($failed -join ', ') + ". Run 'claude plugin install <name>@$MarketplaceName -y' to see why.")
+    Write-Warning ("These did not install: " + ($failed -join ', ') + ". Run the matching 'claude plugin install <name>@<marketplace>' by hand to see why.")
 } else {
     Write-Host "Done. Restart Claude Code to load it."
 }
