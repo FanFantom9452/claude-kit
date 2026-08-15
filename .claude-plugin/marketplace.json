@@ -1,0 +1,31 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "kit",
+  "description": "FanFantom9452's Claude Code setup: session-scoped mode toggles and the tools that read them.",
+  "owner": {
+    "name": "FanFantom9452",
+    "url": "https://github.com/FanFantom9452"
+  },
+  "plugins": [
+    {
+      "name": "caveman",
+      "source": {
+        "source": "github",
+        "repo": "FanFantom9452/caveman",
+        "ref": "per-session"
+      },
+      "description": "Ultra-compressed output. Fork of JuliusBrussee/caveman with the mode flag scoped to one session.",
+      "category": "productivity"
+    },
+    {
+      "name": "ponytail",
+      "source": {
+        "source": "github",
+        "repo": "FanFantom9452/ponytail",
+        "ref": "per-session"
+      },
+      "description": "Lazy senior dev mode. Fork of DietrichGebert/ponytail with the mode flag scoped to one session.",
+      "category": "productivity"
+    }
+  ]
+}
