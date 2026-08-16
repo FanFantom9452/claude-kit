@@ -63,6 +63,20 @@ $DormantTools  = @('caveman', 'ponytail')
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
+# Everything this script runs writes UTF-8 — claude for its plugin and MCP
+# output, and TokenBar for the statusline preview at the end — but the console
+# renders those bytes in whatever code page it happens to be on, which is 950 on
+# a Traditional Chinese Windows, 936 on a Simplified one, 932 on a Japanese one.
+# Nothing here is non-ASCII itself, so the mojibake arrives entirely from the
+# children, and one setting up front covers all of them.
+#
+# OutputEncoding only, never InputEncoding: that setter throws on Windows
+# PowerShell when stdin is redirected, which is exactly how this script is run.
+#
+# Deliberately not put back afterwards. Claude Code writes UTF-8 too, so
+# restoring the old page would only hand the mojibake to the thing you run next.
+try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
+
 if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
     throw 'claude was not found on PATH. Install Claude Code first, then re-run this.'
 }
