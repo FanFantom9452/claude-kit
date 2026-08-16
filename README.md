@@ -20,8 +20,10 @@ Restart Claude Code afterwards.
 
 Safe to re-run — that is how you pick up anything added to the kit since last
 time. An already added marketplace is refreshed rather than duplicated, an
-installed plugin is updated, and a statusline that is already wired is left
-alone instead of rewriting `settings.json` for nothing.
+installed plugin is updated, and a statusline that is already wired has its
+script re-downloaded while `settings.json` is left as it is. Re-running is
+therefore also how a machine picks up a statusline fix; the cost is that local
+edits to the toggle block at the top of the script are overwritten.
 
 ## What it installs
 

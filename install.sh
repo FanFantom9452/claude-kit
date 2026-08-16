@@ -6,7 +6,7 @@
 # registers the MCP servers, and wires up the statusline that reads what those
 # plugins write. Safe to re-run: an already added marketplace is refreshed
 # rather than duplicated, an already installed plugin is updated, and an already
-# configured statusline is left alone.
+# wired statusline has its script re-downloaded while settings.json is left alone.
 
 set -eu
 
@@ -47,6 +47,10 @@ context7|npx -y @upstash/context7-mcp
 '
 
 STATUSLINE_URL='https://raw.githubusercontent.com/FanFantom9452/ClaudeCodeCLI-TokenBar/main/install.sh'
+# The script on its own, for the already-wired case at the bottom. A kit whose
+# whole promise is "latest" is no use if the one file that runs on every render
+# is the one thing it never updates.
+STATUSLINE_SCRIPT='https://raw.githubusercontent.com/FanFantom9452/ClaudeCodeCLI-TokenBar/main/statusline.sh'
 # Modes these plugins start in on a fresh machine. The point of the kit is that
 # they are switched on per window when wanted, not left running everywhere.
 DORMANT_TOOLS='caveman ponytail'
@@ -153,11 +157,54 @@ for tool in $DORMANT_TOOLS; do
 done
 
 # ---- statusline -----------------------------------------------------------
-# Skipped when already wired, so re-running to pick up a new plugin does not
-# rewrite settings.json and leave another backup behind for no reason.
+# The script is always re-downloaded; settings.json is only rewritten when
+# nothing is wired yet. Those are two different questions and the old code
+# answered both with one skip: re-running to pick up a new plugin would leave a
+# fresh settings.json backup behind for a file whose contents did not change, but
+# it also meant a machine that already had the statusline could never be given a
+# fixed one. Running the full installer covers the first case; fetching the
+# script alone covers the second.
+#
+# Overwriting the script discards local edits to the toggle block at its top.
+# Said out loud rather than done quietly — it is the second destructive thing
+# this script does.
 echo
 if grep -q 'statusline\.sh' "$CFG/settings.json" 2>/dev/null; then
-    echo "Statusline : already wired, left alone"
+    # Update the file the wired command actually runs. An install kept outside the
+    # config dir would otherwise be shadowed by a fresh copy next to it that
+    # nothing reads, and the run would report success. perl is what the statusline
+    # itself needs, so it is normally here; the config-dir default covers the rest.
+    sl=$(perl -MJSON::PP -e '
+        open my $fh, "<", $ARGV[0] or exit 1;
+        local $/; my $c = <$fh>; close $fh;
+        $c =~ s/^\xEF\xBB\xBF//;
+        my $j = eval { JSON::PP->new->decode($c) } or exit 1;
+        my $cmd = $j->{statusLine}{command};
+        exit 1 unless defined $cmd;
+        # Most explicit first. The bare-path branch has to test -e rather than
+        # just trusting the tail: TokenBar writes the path alone, which may well
+        # contain a space, but "sh /some/where/statusline.sh" ends the same way
+        # and taking all of that as the path writes the file into nowhere.
+        if ($cmd =~ m{"([^"]*statusline\.sh)"})    { print $1;   exit 0 }
+        if (-e $cmd && $cmd =~ m{statusline\.sh$}) { print $cmd; exit 0 }
+        if ($cmd =~ m{(\S*statusline\.sh)})        { print $1;   exit 0 }
+        exit 1;
+    ' "$CFG/settings.json" 2>/dev/null) || sl=''
+    [ -n "$sl" ] || sl="$CFG/statusline.sh"
+
+    echo "Statusline : already wired - updating the script, settings.json left alone"
+    echo "             $sl"
+    echo "             (local edits to its toggle block are overwritten)"
+    # Fetched beside the target and moved into place, so a transfer that dies
+    # halfway cannot leave a half-written script rendering on every keystroke.
+    if { command -v curl >/dev/null 2>&1 && curl -fsSL "$STATUSLINE_SCRIPT" -o "$sl.new"; } ||
+       { command -v wget >/dev/null 2>&1 && wget -qO "$sl.new" "$STATUSLINE_SCRIPT"; }; then
+        mv "$sl.new" "$sl"
+        chmod +x "$sl"
+    else
+        rm -f "$sl.new"
+        failed="$failed statusline(script)"
+    fi
 else
     echo "Statusline : installing ..."
     curl -fsSL "$STATUSLINE_URL" | sh

@@ -5,7 +5,7 @@
 # registers the MCP servers, and wires up the statusline that reads what those
 # plugins write. Safe to re-run: an already added marketplace is refreshed
 # rather than duplicated, an already installed plugin is updated, and an already
-# configured statusline is left alone.
+# wired statusline has its script re-downloaded while settings.json is left alone.
 #
 # No `exit` anywhere on purpose — this script is meant to be piped into `iex`,
 # where `exit` would take the caller's shell down with it. Fatal problems throw.
@@ -53,6 +53,10 @@ $McpServers = @(
 )
 
 $StatuslineUrl = 'https://raw.githubusercontent.com/FanFantom9452/ClaudeCodeCLI-TokenBar/main/install.ps1'
+# The script on its own, for the already-wired case at the bottom. A kit whose
+# whole promise is "latest" is no use if the one file that runs on every render
+# is the one thing it never updates.
+$StatuslineScript = 'https://raw.githubusercontent.com/FanFantom9452/ClaudeCodeCLI-TokenBar/main/statusline.ps1'
 # Modes these plugins start in on a fresh machine. The point of the kit is that
 # they are switched on per window when wanted, not left running everywhere.
 $DormantTools  = @('caveman', 'ponytail')
@@ -159,23 +163,52 @@ foreach ($tool in $DormantTools) {
 }
 
 # ---- statusline -----------------------------------------------------------
-# Skipped when already wired, so re-running to pick up a new plugin does not
-# rewrite settings.json and leave another backup behind for no reason.
+# The script is always re-downloaded; settings.json is only rewritten when
+# nothing is wired yet. Those are two different questions and the old code
+# answered both with one skip: re-running to pick up a new plugin would leave a
+# fresh settings.json backup behind for a file whose contents did not change, but
+# it also meant a machine that already had the statusline could never be given a
+# fixed one. Running the full installer covers the first case; fetching the
+# script alone covers the second.
+#
+# Overwriting the script discards local edits to the toggle block at its top.
+# Said out loud rather than done quietly — it is the second destructive thing
+# this script does.
 $Settings = Join-Path $Cfg 'settings.json'
-$wired = $false
+$wiredPath = $null
 if (Test-Path $Settings) {
     try {
         $raw = (Get-Content -LiteralPath $Settings -Raw).TrimStart([char]0xFEFF)
         if ($raw.Trim()) {
             $cmd = ($raw | ConvertFrom-Json).statusLine.command
-            if ($cmd -and $cmd -like '*statusline.ps1*') { $wired = $true }
+            if ($cmd -and $cmd -like '*statusline.ps1*') {
+                # Update the file the wired command actually runs. An install kept
+                # outside the config dir would otherwise be shadowed by a fresh copy
+                # next to it that nothing reads, and the run would report success.
+                $m = [regex]::Match($cmd, '"([^"]*statusline\.ps1)"')
+                if (-not $m.Success) { $m = [regex]::Match($cmd, '([^\s"]*statusline\.ps1)') }
+                $wiredPath = if ($m.Success) { $m.Groups[1].Value } else { Join-Path $Cfg 'statusline.ps1' }
+            }
         }
     } catch { }
 }
 
 Write-Host ''
-if ($wired) {
-    Write-Host "Statusline : already wired, left alone"
+if ($wiredPath) {
+    Write-Host "Statusline : already wired - updating the script, settings.json left alone"
+    Write-Host "             $wiredPath"
+    Write-Host "             (local edits to its toggle block are overwritten)"
+    # Fetched beside the target and moved into place, so a transfer that dies
+    # halfway cannot leave a half-written script rendering on every keystroke.
+    $tmp = "$wiredPath.new"
+    try {
+        Invoke-WebRequest -UseBasicParsing -Uri $StatuslineScript -OutFile $tmp -ErrorAction Stop
+        Move-Item -LiteralPath $tmp -Destination $wiredPath -Force -ErrorAction Stop
+    } catch {
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        Write-Warning "  statusline script: $($_.Exception.Message)"
+        $failed += 'statusline (script)'
+    }
 } else {
     Write-Host "Statusline : installing ..."
     Invoke-RestMethod -Uri $StatuslineUrl | Invoke-Expression
