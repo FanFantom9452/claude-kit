@@ -18,8 +18,9 @@ curl -fsSL https://raw.githubusercontent.com/FanFantom9452/claude-kit/main/insta
 
 Restart Claude Code afterwards.
 
-Safe to re-run — that is how you pick up anything added to the kit since last
-time. An already added marketplace is refreshed rather than duplicated, an
+Re-running is how you pick up anything *added to the kit* since last time — a new
+marketplace, a new plugin, a new MCP server. The plugins already installed keep
+themselves current without it; see below. An already added marketplace is refreshed rather than duplicated, an
 installed plugin is updated, and a statusline that is already wired has its
 script re-downloaded while `settings.json` is left as it is. Re-running is
 therefore also how a machine picks up a statusline fix; the cost is that local
@@ -104,6 +105,33 @@ plugin writes at `~/.claude/modes/<session_id>/`:
 [CAVEMAN:ULTRA] | [PONYTAIL:FULL] | Opus 5 | my-project | main ↑2 +42/-7 ?1
 ctx ███▊░░░░░░  38%    ·    5h ██████▌░░░  66%   ↻ 1h 46m    ·    7d █████▊░░░░  58%   ↻ 2d 12h 30m    -6%
 ```
+
+## They keep themselves current
+
+Claude Code refreshes a marketplace at session start only when that marketplace's
+entry in `~/.claude/plugins/known_marketplaces.json` carries `autoUpdate`, and it
+fills that field in from a hardcoded list of Anthropic's own marketplaces.
+Nothing in this kit is on that list. Until the installer started saying otherwise,
+every marketplace here sat at whatever commit it was first cloned at — a kit whose
+whole promise is a current setup, installing one once and then quietly freezing it.
+
+The installer declares the field for each of them under `extraKnownMarketplaces`
+in `settings.json`, which Claude Code copies into `known_marketplaces.json` at
+every session start. Claude Code already writes that block itself when a
+marketplace is added, but only ever fills in the source; the installer adds the
+one missing field and leaves the rest alone. Declaring it there rather than
+writing `known_marketplaces.json` directly means it re-asserts itself on every
+start, instead of being a single write that the next `marketplace add` could undo.
+
+Everything in the kit updates itself except `claude-code-lsps`, which ships
+language-server binaries — worth taking deliberately rather than on a startup you
+did not plan for. Edit the `NoAutoUpdate` / `NO_AUTO_UPDATE` list at the top of
+either installer to change that.
+
+`settings.json` is copied to `settings.json.bak-kit` before it is written, and
+only when the contents actually change, so a re-run that decides nothing leaves
+no backup behind. A `settings.json` that does not parse is reported and left
+alone rather than rewritten from a guess.
 
 ## Uninstall
 

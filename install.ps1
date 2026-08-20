@@ -46,6 +46,15 @@ $Upstream = @(
     @{ Repo = 'Piebald-AI/claude-code-lsps';       Name = 'claude-code-lsps';    Plugins = @('typescript-language-server', 'pyright', 'rust-analyzer') }
 )
 
+# Marketplaces left on manual update. Claude Code refreshes a marketplace on
+# startup only when its known_marketplaces.json entry says autoUpdate, and it
+# fills that field in from a hardcoded list of Anthropic's own marketplaces —
+# nothing here is on it. The block at the bottom turns it on for everything
+# installed above except these. The LSP marketplace ships language-server
+# binaries, which are worth taking deliberately rather than on a startup you
+# did not plan for.
+$NoAutoUpdate = @('claude-code-lsps')
+
 # MCP servers are not plugins and install through a different command entirely.
 $McpServers = @(
     @{ Name = 'playwright'; Args = @('npx', '@playwright/mcp@latest') }
@@ -226,6 +235,59 @@ if ($wiredPath) {
 } else {
     Write-Host "Statusline : installing ..."
     Invoke-RestMethod -Uri $StatuslineUrl | Invoke-Expression
+}
+
+# ---- auto-update ----------------------------------------------------------
+# Without this every marketplace above sits at the commit it was cloned at until
+# someone re-runs this installer by hand, which is the opposite of what a kit is
+# for. The kit's whole promise is that a machine stays current on its own.
+#
+# Written to settings.json rather than to plugins/known_marketplaces.json,
+# because Claude Code copies the autoUpdate field out of extraKnownMarketplaces
+# into that file at every session start. Declared here it re-asserts itself;
+# written there it is one shot that the next `marketplace add` can quietly undo.
+#
+# Last in the script on purpose. The statusline branch above can hand
+# settings.json to a second installer entirely, so this has to be the final word
+# on that file rather than something that installer overwrites.
+Write-Host ''
+Write-Host "Auto-update:"
+try {
+    $doc = $null
+    $old = ''
+    if (Test-Path $Settings) {
+        $old = Get-Content -LiteralPath $Settings -Raw
+        $body = $old.TrimStart([char]0xFEFF)
+        if ($body.Trim()) { $doc = $body | ConvertFrom-Json }
+    }
+    if (-not $doc) { $doc = [pscustomobject]@{} }
+
+    $known = $doc.extraKnownMarketplaces
+    if (-not $known) {
+        $known = [pscustomobject]@{}
+        $doc | Add-Member -NotePropertyName 'extraKnownMarketplaces' -NotePropertyValue $known -Force
+    }
+    foreach ($m in ($Mine + $Upstream)) {
+        $on = -not ($NoAutoUpdate -contains $m.Name)
+        $known | Add-Member -NotePropertyName $m.Name -NotePropertyValue ([pscustomobject]@{
+            source     = [pscustomobject]@{ source = 'github'; repo = $m.Repo }
+            autoUpdate = $on
+        }) -Force
+        Write-Host ("  {0,-22} {1}" -f $m.Name, $(if ($on) { 'on' } else { 'manual' }))
+    }
+
+    # Compared before writing so that a re-run which changes nothing does not
+    # leave a fresh backup of a file whose contents are identical.
+    $new = ($doc | ConvertTo-Json -Depth 20) + [Environment]::NewLine
+    if ($new -ne $old) {
+        if ($old) { Copy-Item -LiteralPath $Settings -Destination "$Settings.bak-kit" -Force }
+        [System.IO.File]::WriteAllText($Settings, $new, [System.Text.UTF8Encoding]::new($false))
+    } else {
+        Write-Host "  settings.json already says this"
+    }
+} catch {
+    Write-Warning "  auto-update: $($_.Exception.Message)"
+    $failed += 'auto-update (settings.json)'
 }
 
 Write-Host ''

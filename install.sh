@@ -39,6 +39,15 @@ multica-ai/andrej-karpathy-skills|karpathy-skills|andrej-karpathy-skills
 Piebald-AI/claude-code-lsps|claude-code-lsps|typescript-language-server pyright rust-analyzer
 '
 
+# Marketplaces left on manual update. Claude Code refreshes a marketplace on
+# startup only when its known_marketplaces.json entry says autoUpdate, and it
+# fills that field in from a hardcoded list of Anthropic's own marketplaces —
+# nothing here is on it. The block at the bottom turns it on for everything
+# installed above except these. The LSP marketplace ships language-server
+# binaries, which are worth taking deliberately rather than on a startup you
+# did not plan for.
+NO_AUTO_UPDATE='claude-code-lsps'
+
 # MCP servers are not plugins and install through a different command entirely.
 # "name|command args..."
 MCP_SERVERS='
@@ -208,6 +217,77 @@ if grep -q 'statusline\.sh' "$CFG/settings.json" 2>/dev/null; then
 else
     echo "Statusline : installing ..."
     curl -fsSL "$STATUSLINE_URL" | sh
+fi
+
+# ---- auto-update ----------------------------------------------------------
+# Without this every marketplace above sits at the commit it was cloned at until
+# someone re-runs this installer by hand, which is the opposite of what a kit is
+# for. The kit's whole promise is that a machine stays current on its own.
+#
+# Written to settings.json rather than to plugins/known_marketplaces.json,
+# because Claude Code copies the autoUpdate field out of extraKnownMarketplaces
+# into that file at every session start. Declared here it re-asserts itself;
+# written there it is one shot that the next `marketplace add` can quietly undo.
+#
+# Last in the script on purpose. The statusline branch above can hand
+# settings.json to a second installer entirely, so this has to be the final word
+# on that file rather than something that installer overwrites.
+#
+# perl again, for the same reason the statusline branch uses it: it is what the
+# statusline itself needs, so it is already here, and JSON::PP has been core
+# since 5.14. A settings.json that does not parse is reported rather than
+# rewritten — better to leave auto-update off than to flatten a file by guessing.
+echo
+echo "Auto-update:"
+if ! { printf '%s\n%s\n' "$MINE" "$UPSTREAM" | perl -MJSON::PP -e '
+    my ($path, $skiplist) = @ARGV;
+    my %skip = map { ($_ => 1) } split " ", $skiplist;
+
+    my ($doc, $old) = ({}, "");
+    if (open my $fh, "<", $path) {
+        local $/;
+        $old = <$fh>;
+        close $fh;
+        $old = "" unless defined $old;
+        my $c = $old;
+        $c =~ s/^\xEF\xBB\xBF//;
+        if ($c =~ /\S/) {
+            $doc = eval { JSON::PP->new->decode($c) };
+            unless (ref $doc eq "HASH") {
+                print STDERR "  settings.json does not parse - left alone\n";
+                exit 1;
+            }
+        }
+    }
+
+    my $known = $doc->{extraKnownMarketplaces} ||= {};
+    while (<STDIN>) {
+        chomp;
+        next unless /\S/;
+        my ($repo, $name) = split /\|/;
+        my $on = $skip{$name} ? JSON::PP::false : JSON::PP::true;
+        $known->{$name} = { source => { source => "github", repo => $repo },
+                            autoUpdate => $on };
+        printf "  %-22s %s\n", $name, ($skip{$name} ? "manual" : "on");
+    }
+
+    # canonical so a re-run that changes nothing produces byte-identical output,
+    # and therefore neither rewrites the file nor leaves a fresh backup.
+    my $new = JSON::PP->new->pretty->canonical->encode($doc);
+    if ($new eq $old) {
+        print "  settings.json already says this\n";
+        exit 0;
+    }
+    if (length $old) {
+        open my $b, ">", "$path.bak-kit" or die "cannot write backup: $!\n";
+        print $b $old;
+        close $b;
+    }
+    open my $out, ">", $path or die "cannot write $path: $!\n";
+    print $out $new;
+    close $out;
+' "$CFG/settings.json" "$NO_AUTO_UPDATE"; }; then
+    failed="$failed auto-update(settings.json)"
 fi
 
 echo
