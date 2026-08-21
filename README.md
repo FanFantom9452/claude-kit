@@ -33,7 +33,7 @@ edits to the toggle block at the top of the script are overwritten.
 | Marketplace | Plugin | |
 |---|---|---|
 | [caveman-per-session](https://github.com/FanFantom9452/caveman) | `caveman` | Ultra-compressed prose |
-| [fankeel](https://github.com/FanFantom9452/fankeel) | `fankeel` | Task registry and a pipeline restated on every prompt |
+| [fankeel](https://github.com/FanFantom9452/FanKeel) | `fankeel` | Task registry and a pipeline restated on every prompt |
 | [ponytail-per-session](https://github.com/FanFantom9452/ponytail) | `ponytail` | Lazy senior dev — YAGNI, stdlib first, shortest diff |
 
 `caveman` and `ponytail` are forks of
@@ -51,7 +51,7 @@ does not — it is still `caveman`, which really does collide, so the installer
 uninstalls the other copy before installing this one and says so when it does.
 `fankeel` has no suffix because it has no upstream to sit beside.
 
-[fankeel](https://github.com/FanFantom9452/fankeel) is written from scratch. It
+[fankeel](https://github.com/FanFantom9452/FanKeel) is written from scratch. It
 puts a session into a named task, restates that task and the rules of its current
 stage on every prompt rather than once at the top, and shows which other live
 terminals are in the same files. `/fankeel` is the way in. It draws a badge on

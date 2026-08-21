@@ -23,7 +23,7 @@ set -eu
 # fankeel's marketplace has no suffix because there is no upstream to sit beside.
 MINE='
 FanFantom9452/caveman|caveman-per-session|caveman
-FanFantom9452/fankeel|fankeel|fankeel
+FanFantom9452/FanKeel|fankeel|fankeel
 FanFantom9452/ponytail|ponytail-per-session|ponytail
 '
 

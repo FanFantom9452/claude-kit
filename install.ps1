@@ -30,7 +30,7 @@ $ErrorActionPreference = 'Continue'
 # fankeel's marketplace has no suffix because there is no upstream to sit beside.
 $Mine = @(
     @{ Repo = 'FanFantom9452/caveman';  Name = 'caveman-per-session';  Plugins = @('caveman') }
-    @{ Repo = 'FanFantom9452/fankeel';  Name = 'fankeel';              Plugins = @('fankeel') }
+    @{ Repo = 'FanFantom9452/FanKeel';  Name = 'fankeel';              Plugins = @('fankeel') }
     @{ Repo = 'FanFantom9452/ponytail'; Name = 'ponytail-per-session'; Plugins = @('ponytail') }
 )
 
