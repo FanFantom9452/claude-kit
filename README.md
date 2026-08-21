@@ -28,14 +28,16 @@ edits to the toggle block at the top of the script are overwritten.
 
 ## What it installs
 
-**Mine** — forks, each published as its own marketplace:
+**Mine** — each published as its own marketplace:
 
 | Marketplace | Plugin | |
 |---|---|---|
 | [caveman-per-session](https://github.com/FanFantom9452/caveman) | `caveman` | Ultra-compressed prose |
+| [fankeel](https://github.com/FanFantom9452/fankeel) | `fankeel` | Task registry and a pipeline restated on every prompt |
 | [ponytail-per-session](https://github.com/FanFantom9452/ponytail) | `ponytail` | Lazy senior dev — YAGNI, stdlib first, shortest diff |
 
-Forks of [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) and
+`caveman` and `ponytail` are forks of
+[JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) and
 [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail), each with
 one change: the mode flag is keyed by session id instead of being one file per
 machine. Upstream keeps it in `~/.claude/.caveman-active`, shared by every
@@ -43,10 +45,17 @@ window, so switching mode in one switched it in all of them and opening a new
 window reset the others to the default. Forked so each terminal carries its own
 level.
 
-The marketplace name carries the `-per-session` suffix so a machine that already
+Their marketplace names carry the `-per-session` suffix so a machine that already
 has upstream's `caveman` or `ponytail` marketplace can keep it. The plugin name
 does not — it is still `caveman`, which really does collide, so the installer
 uninstalls the other copy before installing this one and says so when it does.
+`fankeel` has no suffix because it has no upstream to sit beside.
+
+[fankeel](https://github.com/FanFantom9452/fankeel) is written from scratch. It
+puts a session into a named task, restates that task and the rules of its current
+stage on every prompt rather than once at the top, and shows which other live
+terminals are in the same files. `/fankeel` is the way in. It draws a badge on
+the statusline below, which is the other half of why the two are here together.
 
 **Everyone else's** — listed in the installers, so their updates arrive on their
 schedule and nothing goes stale behind them:
@@ -82,13 +91,17 @@ per-machine. All of them are one `claude plugin install` away when wanted.
 
 ## They start switched off
 
-Both plugins are installed dormant (`defaultMode: "off"`), because the point of
+The two forks are installed dormant (`defaultMode: "off"`), because the point of
 having them per-session is to switch them on where you want them:
 
 ```
 /caveman ultra      this window, until you change it
 /ponytail full      likewise
 ```
+
+fankeel has no such flag and none is written for it. It is in its mode exactly
+when it owns a task — `/fankeel` and start one — and out of it when the task is
+stood down.
 
 Only written on a fresh machine — a default you have set yourself is never
 overwritten by a re-run. To change it:
@@ -102,9 +115,13 @@ The statusline shows which window is in which mode, reading the flags each
 plugin writes at `~/.claude/modes/<session_id>/`:
 
 ```
-[CAVEMAN:ULTRA] | [PONYTAIL:FULL] | Opus 5 | my-project | main ↑2 +42/-7 ?1
+[CAVEMAN:ULTRA] | [FANKEEL:BUILD] | Opus 5 | my-project | main ↑2 +42/-7 ?1
 ctx ███▊░░░░░░  38%    ·    5h ██████▌░░░  66%   ↻ 1h 46m    ·    7d █████▊░░░░  58%   ↻ 2d 12h 30m    -6%
 ```
+
+fankeel's word is the stage it is at rather than an intensity, so the badge moves
+as the work does — `SURVEY`, `DESIGN`, `BUILD`, `VERIFY`, `AUDIT`, `LAND`, and
+`CLASH` when another live terminal is in the same files.
 
 ## They keep themselves current
 
@@ -137,8 +154,10 @@ alone rather than rewritten from a guess.
 
 ```
 claude plugin uninstall caveman@caveman-per-session
+claude plugin uninstall fankeel@fankeel
 claude plugin uninstall ponytail@ponytail-per-session
 claude plugin marketplace remove caveman-per-session
+claude plugin marketplace remove fankeel
 claude plugin marketplace remove ponytail-per-session
 ```
 
@@ -161,7 +180,8 @@ The marketplace name is the `name` field inside that repo's
 pick the new row up on the next re-run.
 
 A plugin written from scratch goes in its own repo with its own
-`marketplace.json`, then gets a row like any other. It cannot be catalogued here
+`marketplace.json`, then gets a row like any other — fankeel is the worked
+example. It cannot be catalogued here
 and pointed at another repo: Claude Code 2.1.233 clones a cross-repo plugin
 `source` over SSH with no HTTPS fallback, so that route fails on any machine
 without a GitHub key. Marketplace clones do fall back, which is why every entry

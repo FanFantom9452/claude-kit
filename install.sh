@@ -13,13 +13,17 @@ set -eu
 # ---- the lists to edit when something joins the kit -----------------------
 # Everything below them is generic. Rows are "repo|marketplace-name|plugin ...".
 
-# Mine: forks of caveman and ponytail, each published as its own marketplace
-# straight from its repo. Not catalogued in a marketplace.json here, because a
-# plugin entry pointing at another GitHub repo is cloned over SSH by Claude Code
-# 2.1.233 with no HTTPS fallback, so it fails on any machine without a GitHub
-# key. The marketplace clone path does fall back, hence one marketplace each.
+# Mine: two forks and one plugin of my own, each published as its own
+# marketplace straight from its repo. Not catalogued in a marketplace.json here,
+# because a plugin entry pointing at another GitHub repo is cloned over SSH by
+# Claude Code 2.1.233 with no HTTPS fallback, so it fails on any machine without
+# a GitHub key. The marketplace clone path does fall back, hence one marketplace
+# each.
+#
+# fankeel's marketplace has no suffix because there is no upstream to sit beside.
 MINE='
 FanFantom9452/caveman|caveman-per-session|caveman
+FanFantom9452/fankeel|fankeel|fankeel
 FanFantom9452/ponytail|ponytail-per-session|ponytail
 '
 
@@ -62,7 +66,7 @@ STATUSLINE_URL='https://raw.githubusercontent.com/FanFantom9452/ClaudeCodeCLI-To
 STATUSLINE_SCRIPT='https://raw.githubusercontent.com/FanFantom9452/ClaudeCodeCLI-TokenBar/main/statusline.sh'
 # Modes these plugins start in on a fresh machine. The point of the kit is that
 # they are switched on per window when wanted, not left running everywhere.
-DORMANT_TOOLS='caveman ponytail'
+DORMANT_TOOLS='caveman ponytail'   # not fankeel: its mode is owning a task
 
 command -v claude >/dev/null 2>&1 || {
     echo "claude was not found on PATH. Install Claude Code first, then re-run this." >&2

@@ -20,13 +20,17 @@ $ErrorActionPreference = 'Continue'
 # ---- the lists to edit when something joins the kit -----------------------
 # Everything below them is generic.
 
-# Mine: forks of caveman and ponytail, each published as its own marketplace
-# straight from its repo. Not catalogued in a marketplace.json here, because a
-# plugin entry pointing at another GitHub repo is cloned over SSH by Claude Code
-# 2.1.233 with no HTTPS fallback, so it fails on any machine without a GitHub
-# key. The marketplace clone path does fall back, hence one marketplace each.
+# Mine: two forks and one plugin of my own, each published as its own
+# marketplace straight from its repo. Not catalogued in a marketplace.json here,
+# because a plugin entry pointing at another GitHub repo is cloned over SSH by
+# Claude Code 2.1.233 with no HTTPS fallback, so it fails on any machine without
+# a GitHub key. The marketplace clone path does fall back, hence one marketplace
+# each.
+#
+# fankeel's marketplace has no suffix because there is no upstream to sit beside.
 $Mine = @(
     @{ Repo = 'FanFantom9452/caveman';  Name = 'caveman-per-session';  Plugins = @('caveman') }
+    @{ Repo = 'FanFantom9452/fankeel';  Name = 'fankeel';              Plugins = @('fankeel') }
     @{ Repo = 'FanFantom9452/ponytail'; Name = 'ponytail-per-session'; Plugins = @('ponytail') }
 )
 
@@ -68,7 +72,7 @@ $StatuslineUrl = 'https://raw.githubusercontent.com/FanFantom9452/ClaudeCodeCLI-
 $StatuslineScript = 'https://raw.githubusercontent.com/FanFantom9452/ClaudeCodeCLI-TokenBar/main/statusline.ps1'
 # Modes these plugins start in on a fresh machine. The point of the kit is that
 # they are switched on per window when wanted, not left running everywhere.
-$DormantTools  = @('caveman', 'ponytail')
+$DormantTools  = @('caveman', 'ponytail')   # not fankeel: its mode is owning a task
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
